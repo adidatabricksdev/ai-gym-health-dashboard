@@ -18,11 +18,10 @@ import xml.etree.ElementTree as ET
 
 zip_files = [f for f in dbutils.fs.ls(volume_path) if f.name.endswith(".zip")]
 assert zip_files, f"No export.zip found in {volume_path} — upload your Apple Health export first"
-latest_zip = sorted(zip_files, key=lambda f: f.modificationTime, reverse=True)[0].path
-
-local_zip = "/tmp/apple_health_export.zip"
-dbutils.fs.cp(latest_zip, f"file:{local_zip}")
-print(f"Processing: {latest_zip}")
+latest_zip_info = sorted(zip_files, key=lambda f: f.modificationTime, reverse=True)[0]
+# Unity Catalog volumes are directly accessible via POSIX path — no copy to /tmp needed
+posix_path = latest_zip_info.path.replace("dbfs:", "")
+print(f"Processing: {posix_path}")
 
 # COMMAND ----------
 
@@ -30,7 +29,7 @@ records = []
 workouts = []
 activity_summaries = []
 
-with zipfile.ZipFile(local_zip, "r") as zf:
+with zipfile.ZipFile(posix_path, "r") as zf:
     with zf.open("apple_health_export/export.xml") as f:
         for event, elem in ET.iterparse(f, events=["end"]):
 
@@ -79,8 +78,12 @@ print(f"Activity summaries: {len(activity_summaries):,}")
 
 # COMMAND ----------
 
-spark.createDataFrame(records).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.health_records")
-spark.createDataFrame(workouts).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.workouts")
-spark.createDataFrame(activity_summaries).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.activity_summary")
+# Coerce None to empty string so Spark can infer types on sparse fields
+def nulls_to_empty(rows):
+    return [{k: (v if v is not None else "") for k, v in row.items()} for row in rows]
+
+spark.createDataFrame(nulls_to_empty(records)).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.health_records")
+spark.createDataFrame(nulls_to_empty(workouts)).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.workouts")
+spark.createDataFrame(nulls_to_empty(activity_summaries)).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.activity_summary")
 
 print(f"Written: {catalog}.{schema}.health_records / workouts / activity_summary")
