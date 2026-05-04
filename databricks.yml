@@ -3,7 +3,7 @@ bundle:
 
 variables:
   catalog:
-    default: main
+    default: claudecatalog
   schema:
     default: health_dashboard
 
