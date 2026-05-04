@@ -1,0 +1,27 @@
+# Apple Health raw export - upload directly to Databricks volume instead
+data/export.zip
+data/export.xml
+data/*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+venv/
+
+# Databricks
+.databricks/
+bundle.lock
+.databricks-resources.json
+
+# Claude Code / local dev kit
+.claude/
+.ai-dev-kit/
+.mcp.json
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace

@@ -1,0 +1,62 @@
+bundle:
+  name: ai-gym-health-dashboard
+
+variables:
+  catalog:
+    default: main
+  schema:
+    default: health_dashboard
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-PLACEHOLDER.azuredatabricks.net  # replace with your workspace URL
+
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-PLACEHOLDER.azuredatabricks.net  # replace with your workspace URL
+
+resources:
+  jobs:
+    health_pipeline:
+      name: health-data-pipeline
+      tasks:
+        - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ./notebooks/bronze/01_ingest_healthkit_xml.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+          job_cluster_key: pipeline_cluster
+
+        - task_key: silver_clean
+          depends_on:
+            - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ./notebooks/silver/02_clean_health_metrics.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+          job_cluster_key: pipeline_cluster
+
+        - task_key: gold_aggregate
+          depends_on:
+            - task_key: silver_clean
+          notebook_task:
+            notebook_path: ./notebooks/gold/03_aggregate_daily_metrics.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+          job_cluster_key: pipeline_cluster
+
+      job_clusters:
+        - job_cluster_key: pipeline_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
