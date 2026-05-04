@@ -3,21 +3,25 @@ bundle:
 
 variables:
   catalog:
-    default: claudecatalog
-  schema:
-    default: health_dashboard
+    default: ai_gym
+  bronze_schema:
+    default: bronze
+  silver_schema:
+    default: silver
+  gold_schema:
+    default: gold
 
 targets:
   dev:
     mode: development
     default: true
     workspace:
-      host: https://adb-PLACEHOLDER.azuredatabricks.net  # replace with your workspace URL
+      host: https://dbc-c912b66b-a459.cloud.databricks.com
 
   prod:
     mode: production
     workspace:
-      host: https://adb-PLACEHOLDER.azuredatabricks.net  # replace with your workspace URL
+      host: https://dbc-c912b66b-a459.cloud.databricks.com
 
 resources:
   jobs:
@@ -29,7 +33,7 @@ resources:
             notebook_path: ./notebooks/bronze/01_ingest_healthkit_xml.py
             base_parameters:
               catalog: ${var.catalog}
-              schema: ${var.schema}
+              schema: ${var.bronze_schema}
           job_cluster_key: pipeline_cluster
 
         - task_key: silver_clean
@@ -39,7 +43,8 @@ resources:
             notebook_path: ./notebooks/silver/02_clean_health_metrics.py
             base_parameters:
               catalog: ${var.catalog}
-              schema: ${var.schema}
+              bronze_schema: ${var.bronze_schema}
+              schema: ${var.silver_schema}
           job_cluster_key: pipeline_cluster
 
         - task_key: gold_aggregate
@@ -49,7 +54,8 @@ resources:
             notebook_path: ./notebooks/gold/03_aggregate_daily_metrics.py
             base_parameters:
               catalog: ${var.catalog}
-              schema: ${var.schema}
+              silver_schema: ${var.silver_schema}
+              schema: ${var.gold_schema}
           job_cluster_key: pipeline_cluster
 
       job_clusters:
